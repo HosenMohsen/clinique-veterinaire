@@ -7,27 +7,74 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Attribute\Groups;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use App\State\UserPasswordHasherProcessor;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Serializer\Annotation\MaxDepth;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-#[ApiResource()]
-class User
+#[ApiResource(
+    normalizationContext: ['groups' => ['read']],
+    denormalizationContext: ['groups' => ['write']],
+    operations: [
+        new GetCollection(security: "is_granted('ROLE_DIRECTOR')"),
+        new Post(processor: UserPasswordHasherProcessor::class, security: "is_granted('ROLE_DIRECTOR')"),
+        new Get(security: "
+            is_granted('ROLE_DIRECTOR') or
+            (is_granted('ROLE_USER') and object == user)"),
+        new Put(processor: UserPasswordHasherProcessor::class),
+        new Patch(processor: UserPasswordHasherProcessor::class, security: "is_granted('ROLE_DIRECTOR') or object == user"),
+        new Delete(security: "is_granted('ROLE_DIRECTOR')"),
+    ],
+)]
+class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    #[Groups('read')]
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
     private ?string $nom = null;
 
+     /**
+     * @var list<string> The user roles
+     */
+    #[ORM\Column]
+    #[Groups(['read', 'write'])]
+    private array $roles = [];
+
+    #[Groups(['read', 'write'])]
+    #[ORM\OneToMany(mappedBy: 'proprietaire', targetEntity: Animal::class)]
+    private Collection $animals;
+
+    #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
     private ?string $prenom = null;
 
+    /* #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
-    private ?string $role = null;
+    private ?string $role = null; */
 
+    #[Groups('read')]
     #[ORM\Column(length: 255)]
     private ?string $password = null;
+
+    #[ORM\Column(length: 180)]
+    #[Groups(['read', 'write'])]
+    private ?string $email = null;
+
+    #[Groups('write')]
+    private ?string $plainPassword = null;
 
     /**
      * @var Collection<int, Consultation>
@@ -35,10 +82,73 @@ class User
     #[ORM\OneToMany(targetEntity: Consultation::class, mappedBy: 'assistant')]
     private Collection $consultations;
 
+
     public function __construct()
     {
         $this->consultations = new ArrayCollection();
     }
+     /**
+     * @see UserInterface
+     *
+     * @return list<string>
+     */
+    public function getRoles(): array
+    {
+        $roles = $this->roles;
+        // guarantee every user at least has ROLE_USER
+         $roles[] = 'ROLE_USER';
+
+        return array_unique($roles);
+    }
+
+    /**
+     * @param list<string> $roles
+     */
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+
+        return $this;
+    }
+
+  
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
+     /**
+     * A visual identifier that represents this user.
+     *
+     * @see UserInterface
+     */
+    
+     public function getUserIdentifier(): string
+     {
+         return (string) $this->email;
+     }
+
+
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+ 
+    public function setPlainPassword(string $plainPassword): static
+    {
+        $this->plainPassword = $plainPassword;
+ 
+        return $this;
+    }
+
+    
 
     public function getId(): ?int
     {
@@ -69,7 +179,7 @@ class User
         return $this;
     }
 
-    public function getRole(): ?string
+  /*   public function getRole(): ?string
     {
         return $this->role;
     }
@@ -79,7 +189,7 @@ class User
         $this->role = $role;
 
         return $this;
-    }
+    } */
 
     public function getPassword(): ?string
     {
@@ -121,5 +231,9 @@ class User
         }
 
         return $this;
+    }
+
+    public function eraseCredentials(): void{
+        $this->plainPassword = null;
     }
 }

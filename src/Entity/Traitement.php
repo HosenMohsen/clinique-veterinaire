@@ -8,25 +8,46 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
+use Symfony\Component\Serializer\Attribute\Groups;
+
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
 
 #[ORM\Entity(repositoryClass: TraitementRepository::class)]
-#[ApiResource()]
+#[ApiResource(
+    normalizationContext: ['groups' => ['read']],
+    denormalizationContext: ['groups' => ['write']]
+)]
+#[Get(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_VETERINARIAN')")]
+#[GetCollection(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_VETERINARIAN')")]
+#[Patch(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_VETERINARIAN')")]
+#[Delete(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_VETERINARIAN')")]
+#[Post(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_VETERINARIAN')")]
 class Traitement
 {
+    #[Groups('read')]
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
     private ?string $nom = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column(type: Types::TEXT)]
     private ?string $description = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column]
     private ?float $prix = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column]
     private ?int $duree = null;
 

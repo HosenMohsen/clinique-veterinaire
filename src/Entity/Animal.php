@@ -8,25 +8,60 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
+use Symfony\Component\Serializer\Attribute\Groups;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use App\Entity\User;
+use App\Entity\Media;
+use App\Entity\Consultation;
+use Symfony\Component\Serializer\Annotation\MaxDepth;
 
 #[ORM\Entity(repositoryClass: AnimalRepository::class)]
-#[ApiResource()]
+#[ApiResource(
+    forceEager: false,
+    normalizationContext: ['groups' => ['read']],
+    denormalizationContext: ['groups' => ['write']],
+    operations: [
+        new GetCollection(security: "is_granted('ROLE_DIRECTOR') or is_granted('ROLE_ASSISTANT')"),
+        new Post(security: "is_granted('ROLE_DIRECTOR') or is_granted('ROLE_ASSISTANT')"),
+        new Get(security: "is_granted('ROLE_DIRECTOR') or is_granted('ROLE_ASSISTANT')"),
+        new Put(),
+        new Patch(security: "is_granted('ROLE_DIRECTOR') or is_granted('ROLE_ASSISTANT')"),
+        new Delete(security: "is_granted('ROLE_DIRECTOR') or is_granted('ROLE_ASSISTANT')"),
+    ],
+)]
 class Animal
 {
+    #[Groups('read')]
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
     private ?string $nom = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\Column(length: 255)]
     private ?string $espece = null;
 
+    #[Groups(['read', 'write'])]
+    #[ORM\JoinColumn(nullable: false)]
+    #[MaxDepth(1)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'animals')]
+
+    private ?User $proprietaire = null;
+
+    #[Groups(['read', 'write'])]
     #[ORM\Column(type: Types::DATE_MUTABLE)]
     private ?\DateTimeInterface $date_naissance = null;
 
+    #[Groups(['read', 'write'])]
     #[ORM\OneToOne(inversedBy: 'animal', cascade: ['persist', 'remove'])]
     #[ORM\JoinColumn(nullable: false)]
     private ?Media $photo = null;
@@ -55,6 +90,18 @@ class Animal
     public function setNom(string $nom): static
     {
         $this->nom = $nom;
+
+        return $this;
+    }
+
+    public function getProprietaire(): ?User
+    {
+        return $this->proprietaire;
+    }
+
+    public function setProprietaire(?User $proprietaire): static
+    {
+        $this->proprietaire = $proprietaire;
 
         return $this;
     }
